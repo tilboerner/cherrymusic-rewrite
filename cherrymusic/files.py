@@ -52,14 +52,16 @@ class Path(ImmutableNamespace):
         return type(self)(other, parent=self, **kwargs)
 
     @property
-    def path(self):
-        return sys.intern(os.path.join(self.parent, self.name))
+    def path(self):  # may contain surrogates from errors='surrogateescape')
+        return os.fspath(self)
 
-    def __fspath__(self):
-        return os.path.join(self.parent, self.name)
+    def __fspath__(self):  # may contain surrogates from errors='surrogateescape')
+        # since self.name and self.parent are normalized, we can concat instead of os.path.join
+        path = (self.parent and self.parent + os.path.sep) + self.name
+        return sys.intern(path)
 
-    def __str__(self):
-        return os.fsdecode(self)  # may contain surrogates from errors='surrogateescape')
+    def __str__(self):  # may contain surrogates from errors='surrogateescape')
+        return os.fsdecode(self)
 
     def __hash__(self):
         return hash(os.fspath(self))
@@ -67,13 +69,17 @@ class Path(ImmutableNamespace):
     def __eq__(self, other):
         if self is other:  # pragma: no cover
             return True
-        if not isinstance(other, (str, os.PathLike, bytes)):
-            return NotImplemented
-        return os.fspath(self) == os.fspath(other)
+        if isinstance(other, Path):  # shortcut: no need to build the actual path
+            return self.name == other.name and self.parent == other.parent
+        if isinstance(other, (str, bytes, os.PathLike)):
+            return os.fspath(self) == os.fspath(other)
+        return NotImplemented
 
     def __ne__(self, other):
         if self is other:  # pragma: no cover
             return False
-        if not isinstance(other, (str, os.PathLike, bytes)):
-            return NotImplemented
-        return not (os.fspath(self) == os.fspath(other))
+        if isinstance(other, Path):  # shortcut: no need to build the actual path
+            return self.name != other.name or self.parent != other.parent
+        if isinstance(other, (str, bytes, os.PathLike)):
+            return os.fspath(self) != os.fspath(other)
+        return NotImplemented
