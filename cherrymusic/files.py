@@ -4,7 +4,7 @@ import os
 import pathlib
 import sys
 
-from cherrymusic.types import ImmutableNamespace, CachedProperty
+from cherrymusic.types import ImmutableNamespace, CachedProperty, WeakrefCachedProperty
 
 
 class Path(ImmutableNamespace):
@@ -51,7 +51,7 @@ class Path(ImmutableNamespace):
     def make_child(self, other, **kwargs):
         return type(self)(other, parent=self, **kwargs)
 
-    @property
+    @WeakrefCachedProperty
     def path(self):  # may contain surrogates from errors='surrogateescape')
         return os.fspath(self)
 

@@ -1,5 +1,7 @@
 # -*- coding: UTF-8 -*-
+from collections import MutableMapping
 from types import SimpleNamespace
+from weakref import WeakKeyDictionary
 
 
 class ImmutableNamespace(SimpleNamespace):
@@ -26,15 +28,22 @@ class CachedProperty:
 
     Note:
         This only works for classes whose instances have a writable `__dict__`.
+        You can use a different cache (and key function) by using the respective init kwargs.
 
     Args:
         getter: A function to determine the value of the property; it will receive the instance
                 as its sole argument.
+        cache: A MutableMapping to use as cache instead of `instance.__dict__`.
+        key: A function to derive the cache key from the arguments (descriptor, instance, owner).
+             If none is specified, the instance will be used as the cache key.
     """
 
-    def __init__(self, getter):
+    def __init__(self, getter, *, cache=None, key=None):
         assert callable(getter)
+        assert cache is None or isinstance(cache, MutableMapping)
         self.getter = getter
+        self.cache = cache
+        self.key = key
 
     def __set_name__(self, owner, name):
         # called by Py3.6+
@@ -43,11 +52,20 @@ class CachedProperty:
     def __get__(self, instance, owner):
         if instance is None:  # pragma: no cover
             return self
-        cache = instance.__dict__
-        key = self.name
+        if self.cache is None:
+            cache = instance.__dict__
+            key = self.name
+        else:
+            cache = self.cache
+            key = instance if self.key is None else self.key(self, instance, owner)
         try:
             return cache[key]
         except KeyError:
             result = self.getter(instance)
             cache[key] = result
             return result
+
+
+class WeakrefCachedProperty(CachedProperty):
+    def __init__(self, getter):
+        super().__init__(getter, cache=WeakKeyDictionary())
