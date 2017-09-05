@@ -83,3 +83,34 @@ class Path(ImmutableNamespace):
         if isinstance(other, (str, bytes, os.PathLike)):
             return os.fspath(self) != os.fspath(other)
         return NotImplemented
+
+
+def recursive_scandir(path, *, root=None, filters=()):
+    root = root or path
+    start = Path(os.path.relpath(path, root), is_dir=os.path.isdir(path))
+
+    # path is not a directory -> no recursion
+    if not start.is_dir:
+        if not os.path.exists(start):
+            raise FileNotFoundError(f'No such file or directory: {path!r}')
+        yield start
+        return
+
+    # path is a directory -> recursive scanning
+    dirstack = [start]  # LIFO == depth-first
+    while dirstack:
+        current = dirstack.pop()
+        yield current
+        dir_entries = os.scandir(os.path.join(root, current))
+        for entry in dir_entries:
+            child = current.make_child(
+                entry.name,
+                is_dir=entry.is_dir(),
+                is_symlink=entry.is_symlink(),
+            )
+            if not all(accept(child) for accept in filters):
+                continue
+            if child.is_dir:
+                dirstack.append(child)
+            else:
+                yield child
