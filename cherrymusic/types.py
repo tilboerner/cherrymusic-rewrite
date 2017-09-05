@@ -15,7 +15,21 @@ class ImmutableNamespace(SimpleNamespace):
 class CachedProperty:
     """A descriptor that shadows itself in the instance dict with the value of the first access
 
-    This only works for classes whose instances have a writable __dict__.
+    It works like a regular property, but does not define `__set__` and `__delete__` methods, which
+    means Python will try to access actual instance attributes before falling back to the
+    descriptor.
+    (See `Python doc <https://docs.python.org/3/howto/descriptor.html#descriptor-protocol>`_.)
+
+    The descriptor takes advantage of this mechanism by writing the result of its first access into
+    the instance's `__dict__` under its own name, effectively shadowing itself with the resulting
+    instance attribute.
+
+    Note:
+        This only works for classes whose instances have a writable `__dict__`.
+
+    Args:
+        getter: A function to determine the value of the property; it will receive the instance
+                as its sole argument.
     """
 
     def __init__(self, getter):
