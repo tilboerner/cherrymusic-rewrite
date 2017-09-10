@@ -83,13 +83,10 @@ class Path(ImmutableNamespace):
         return NotImplemented
 
     def __ne__(self, other):
-        if self is other:  # pragma: no cover
-            return False
-        if isinstance(other, Path):  # shortcut: no need to build the actual path
-            return self.name != other.name or self.parent != other.parent
-        if isinstance(other, (str, bytes, os.PathLike)):
-            return os.fspath(self) != os.fspath(other)
-        return NotImplemented
+        equal = self.__eq__(other)
+        if equal is NotImplemented:
+            return NotImplemented
+        return not equal
 
 
 def recursive_scandir(path, *, root=None, filters=()):
