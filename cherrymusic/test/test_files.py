@@ -1,7 +1,10 @@
 # -*- coding: UTF-8 -*-
 import os
 
+import pytest
+
 from cherrymusic import files
+from cherrymusic.test.helpers import tempdir
 
 
 def test_path_attributes():
@@ -102,3 +105,60 @@ def test_path_string_attributes_are_interned():
     assert files.Path('SOME_NAME').name is files.Path('SOME_NAME').name
     assert files.Path('PARENT/NAME').path is files.Path('PARENT/NAME').path
     assert files.Path('PARENT/NAME').parent is files.Path('PARENT/NAME').parent
+
+
+def test_recursive_scandir():
+    with tempdir('file', 'dir/subfile') as tmp_path:
+        found_paths = {str(p): p for p in files.recursive_scandir(tmp_path)}
+
+    assert found_paths.keys() == {'file', 'dir', 'dir/subfile'}
+    assert found_paths['dir'].is_dir is True
+    assert found_paths['file'].is_dir is False
+    assert found_paths['dir/subfile'].is_dir is False
+
+
+def test_recursive_scandir_yields_startpath_if_file_or_subdir():
+    with tempdir('dir/file') as tmp_dir:
+        assert list(files.recursive_scandir('file', root=tmp_dir / 'dir')) == ['file']
+        assert list(files.recursive_scandir('dir', root=tmp_dir)) == ['dir', 'dir/file']
+        assert list(files.recursive_scandir(tmp_dir / 'dir')) == ['file']
+
+
+def test_recursive_scandir_filters():
+    def no_fizz(path):
+        return int(path.name) % 2 != 0
+
+    def no_buzz(path):
+        return int(path.name) % 3 != 0
+
+    with tempdir(*[str(i) for i in range(10)]) as tmp_path:
+        objs = {
+            str(o): o
+            for o in files.recursive_scandir(tmp_path, filters=(no_fizz, no_buzz))
+        }
+
+    assert objs.keys() == {'1', '5', '7'}
+
+
+def test_recursive_scandir_symlinks():
+    links = {
+        'root/link': 'other/file',
+        'root/dirlink': 'other/',
+    }
+    with tempdir(links=links) as tmp_path:
+        root_path = tmp_path / 'root'
+        objs = {
+            str(o): o
+            for o in files.recursive_scandir('.', root=root_path)
+        }
+
+        assert objs.keys() == {'link', 'dirlink/file', 'dirlink'}
+        assert objs['dirlink'].is_dir
+        assert not objs['dirlink/file'].is_dir
+        assert not objs['link'].is_dir
+        assert os.path.samefile(root_path / objs['dirlink/file'], root_path / objs['link'])
+
+
+def test_recursive_scandir_raises_error_when_invalid_startpath():
+    with pytest.raises(FileNotFoundError):
+        list(files.recursive_scandir('STARTPATH_DOES_NOT_EXIST'))

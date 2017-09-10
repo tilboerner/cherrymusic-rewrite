@@ -1,10 +1,13 @@
 # -*- coding: UTF-8 -*-
-
+import logging
 import os
 import pathlib
 import sys
 
 from cherrymusic.types import ImmutableNamespace, CachedProperty, WeakrefCachedProperty
+
+
+log = logging.getLogger(__name__)
 
 
 class Path(ImmutableNamespace):
@@ -89,22 +92,32 @@ class Path(ImmutableNamespace):
 
 
 def recursive_scandir(path, *, root=None, filters=()):
-    root = root or path
-    start = Path(os.path.relpath(path, root), is_dir=os.path.isdir(path))
+    if not root:
+        root = path = os.path.abspath(path)
+    else:
+        root = os.path.abspath(root)
+    startpath = os.path.join(root, path)
+    start = Path(os.path.relpath(startpath, root), is_dir=os.path.isdir(startpath))
 
     # path is not a directory -> no recursion
     if not start.is_dir:
-        if not os.path.exists(start):
-            raise FileNotFoundError(f'No such file or directory: {path!r}')
+        if not os.path.exists(startpath):
+            raise FileNotFoundError(f'No such file or directory: {startpath!r}')
         yield start
         return
 
     # path is a directory -> recursive scanning
+    if start != '.':
+        yield start
     dirstack = [start]  # LIFO == depth-first
     while dirstack:
         current = dirstack.pop()
-        yield current
-        dir_entries = os.scandir(os.path.join(root, current))
+        try:
+            scanpath = os.path.join(root, current.path)
+            dir_entries = os.scandir(scanpath)
+        except OSError as error:  # pragma: no cover
+            log.error('Error scanning directory %r: %s', scanpath, error)
+            continue
         for entry in dir_entries:
             child = current.make_child(
                 entry.name,
@@ -115,5 +128,4 @@ def recursive_scandir(path, *, root=None, filters=()):
                 continue
             if child.is_dir:
                 dirstack.append(child)
-            else:
-                yield child
+            yield child
