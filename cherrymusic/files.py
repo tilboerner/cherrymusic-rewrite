@@ -116,20 +116,20 @@ def recursive_scandir(path, *, root=None, filters=()):
         try:
             scanpath = os.path.join(root, current.path)
             dir_entries = os.scandir(scanpath)
+            for entry in dir_entries:
+                child = current.make_child(
+                    entry.name,
+                    is_dir=entry.is_dir(),
+                    is_symlink=entry.is_symlink(),
+                )
+                if not all(accept(child) for accept in filters):
+                    continue
+                if child.is_dir:
+                    dirstack.append(child)
+                yield child
         except OSError as error:  # pragma: no cover
             log.error('Error scanning directory %r: %s', scanpath, error)
             continue
-        for entry in dir_entries:
-            child = current.make_child(
-                entry.name,
-                is_dir=entry.is_dir(),
-                is_symlink=entry.is_symlink(),
-            )
-            if not all(accept(child) for accept in filters):
-                continue
-            if child.is_dir:
-                dirstack.append(child)
-            yield child
 
 
 def canonical_path(path, *, root=None):
