@@ -150,13 +150,16 @@ def circular_symlink_filter(root):
 
     def is_noncircular_symlink(path):
         try:
-            is_link = path.is_symlink
+            is_link, is_dir = path.is_symlink, path.is_dir
             assert isinstance(is_link, bool)  # pragma: no cover
+            assert isinstance(is_dir, bool)  # pragma: no cover
         except AttributeError:
             is_link = os.path.islink(os.path.join(root, path))
-        if is_link:
+            is_dir = os.path.isdir(os.path.join(root, path))
+        if is_link and is_dir:
             testpath = os.path.join(canonical_path(path, root=root), '')  # end in path sep
             if any(r.startswith(testpath) or testpath.startswith(r) for r in known_roots):
+                log.info('Skipping circular symlink %r -> %r', str(path), testpath)
                 return False
             known_roots.add(testpath)
         return True

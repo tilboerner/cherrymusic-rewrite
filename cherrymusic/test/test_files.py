@@ -176,18 +176,20 @@ def test_canonical_path():
 
 def test_circular_symlink_filter():
     links = {
+        'root/safe_always': 'root/links_to_files_are_safe',
         'root/safe_once': 'other/safe_once/',
         'root/above_known_root': 'other/',
-        'root/below_known_root': 'other/safe_once/child',
+        'root/below_known_root': 'other/safe_once/child/',
         'root/back_to_root': 'root/',
-        'root/safe_despite_common_suffix': 'other/safe_once_2'
+        'root/safe_despite_common_suffix': 'other/safe_once_2/'
     }
     with tempdir(links=links) as testpath:
         filter_allows = files.circular_symlink_filter(root=testpath / 'root')
 
         assert filter_allows('not_a_link')
-        assert not filter_allows('back_to_root')
+        assert filter_allows('safe_always') and filter_allows('safe_always')
         assert filter_allows('safe_once') and not filter_allows('safe_once')  # no idempotence!
         assert not filter_allows('above_known_root')
         assert not filter_allows('below_known_root')
+        assert not filter_allows('back_to_root')
         assert filter_allows('safe_despite_common_suffix')
