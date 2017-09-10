@@ -162,3 +162,32 @@ def test_recursive_scandir_symlinks():
 def test_recursive_scandir_raises_error_when_invalid_startpath():
     with pytest.raises(FileNotFoundError):
         list(files.recursive_scandir('STARTPATH_DOES_NOT_EXIST'))
+
+
+def test_canonical_path():
+    with tempdir('file', links={'link': 'file'}) as testdir:
+        assert files.canonical_path(testdir / 'file') == str(testdir / 'file')
+        assert files.canonical_path(testdir / 'file', root=testdir) == str(testdir / 'file')
+        assert files.canonical_path('file', root=testdir) == str(testdir / 'file')
+        assert files.canonical_path('link', root=testdir) == str(testdir / 'file')
+        assert files.canonical_path('.', root='.') == os.getcwd()
+        assert files.canonical_path(b'.') == os.getcwdb()
+
+
+def test_circular_symlink_filter():
+    links = {
+        'root/safe_once': 'other/safe_once/',
+        'root/above_known_root': 'other/',
+        'root/below_known_root': 'other/safe_once/child',
+        'root/back_to_root': 'root/',
+        'root/safe_despite_common_suffix': 'other/safe_once_2'
+    }
+    with tempdir(links=links) as testpath:
+        filter_allows = files.circular_symlink_filter(root=testpath / 'root')
+
+        assert filter_allows('not_a_link')
+        assert not filter_allows('back_to_root')
+        assert filter_allows('safe_once') and not filter_allows('safe_once')  # no idempotence!
+        assert not filter_allows('above_known_root')
+        assert not filter_allows('below_known_root')
+        assert filter_allows('safe_despite_common_suffix')

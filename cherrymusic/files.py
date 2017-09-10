@@ -129,3 +129,35 @@ def recursive_scandir(path, *, root=None, filters=()):
             if child.is_dir:
                 dirstack.append(child)
             yield child
+
+
+def canonical_path(path, *, root=None):
+    if not os.path.isabs(path):
+        if root:
+            root = canonical_path(root)
+        else:
+            getcwd = os.getcwdb if isinstance(path, bytes) else os.getcwd
+            root = getcwd()
+        path = os.path.join(root, path)
+    return os.path.normcase(os.path.realpath(path))  # resolve symlinks and normalize
+
+
+def circular_symlink_filter(root):
+    root = os.fspath(root)
+    canonical_root = os.path.join(canonical_path(root), '')  # end in path sep
+    known_roots = {canonical_root}
+
+    def is_noncircular_symlink(path):
+        try:
+            is_link = path.is_symlink
+            assert isinstance(is_link, bool)  # pragma: no cover
+        except AttributeError:
+            is_link = os.path.islink(os.path.join(root, path))
+        if is_link:
+            testpath = os.path.join(canonical_path(path, root=root), '')  # end in path sep
+            if any(r.startswith(testpath) or testpath.startswith(r) for r in known_roots):
+                return False
+            known_roots.add(testpath)
+        return True
+
+    return is_noncircular_symlink
