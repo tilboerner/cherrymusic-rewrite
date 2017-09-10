@@ -77,6 +77,7 @@ def test_path_normalization():
     assert files.Path('SOME_NAME/') == files.Path('SOME_NAME')
     assert files.Path('SOME_NAME/.') == files.Path('SOME_NAME')
     assert files.Path('SOME_NAME/CHILD/..') == files.Path('SOME_NAME')
+    assert files.Path('./').make_child('SOME_NAME') == files.Path('SOME_NAME')
 
 
 def test_path_root():

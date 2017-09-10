@@ -20,7 +20,10 @@ class Path(ImmutableNamespace):
             # happy path: almost no normalization needed, depth can simply be incremented
             kwargs.setdefault('depth', parent.depth + 1)
             name = os.path.normcase(name)
-            parent = os.path.join(parent.parent, parent.name)
+            if parent.name == '.':
+                parent = parent.parent
+            else:
+                parent = os.path.join(parent.parent, parent.name)
         else:
             # force to str and normalize (strs may contain surrogates from errors='surrogateescape')
             path = os.path.join(*map(os.fsdecode, (parent or '', name)))
