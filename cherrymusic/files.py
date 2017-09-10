@@ -4,7 +4,7 @@ import os
 import pathlib
 import sys
 
-from cherrymusic.types import ImmutableNamespace, CachedProperty, WeakrefCachedProperty
+from cherrymusic.types import ImmutableNamespace, CachedProperty
 
 
 log = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class Path(ImmutableNamespace):
             if parent.name == '.':
                 parent = parent.parent
             else:
-                parent = os.path.join(parent.parent, parent.name)
+                parent = parent.path
         else:
             # force to str and normalize (strs may contain surrogates from errors='surrogateescape')
             path = os.path.join(*map(os.fsdecode, (parent or '', name)))
@@ -57,14 +57,15 @@ class Path(ImmutableNamespace):
     def make_child(self, other, **kwargs):
         return type(self)(other, parent=self, **kwargs)
 
-    @WeakrefCachedProperty
+    @CachedProperty
     def path(self):  # may contain surrogates from errors='surrogateescape')
-        return os.fspath(self)
+        # since self.name and self.parent are normalized, we can concat instead of os.path.join
+        parent, name = self.parent, self.name
+        path = (parent and parent + os.path.sep) + name
+        return sys.intern(path)
 
     def __fspath__(self):  # may contain surrogates from errors='surrogateescape')
-        # since self.name and self.parent are normalized, we can concat instead of os.path.join
-        path = (self.parent and self.parent + os.path.sep) + self.name
-        return sys.intern(path)
+        return self.path
 
     def __str__(self):  # may contain surrogates from errors='surrogateescape')
         return os.fsdecode(self)

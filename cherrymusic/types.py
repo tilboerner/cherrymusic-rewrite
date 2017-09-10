@@ -33,17 +33,11 @@ class CachedProperty:
     Args:
         getter: A function to determine the value of the property; it will receive the instance
                 as its sole argument.
-        cache: A MutableMapping to use as cache instead of `instance.__dict__`.
-        key: A function to derive the cache key from the arguments (descriptor, instance, owner).
-             If none is specified, the instance will be used as the cache key.
     """
 
-    def __init__(self, getter, *, cache=None, key=None):
+    def __init__(self, getter):
         assert callable(getter)
-        assert cache is None or isinstance(cache, MutableMapping)
         self.getter = getter
-        self.cache = cache
-        self.key = key
 
     def __set_name__(self, owner, name):
         # called by Py3.6+
@@ -52,20 +46,11 @@ class CachedProperty:
     def __get__(self, instance, owner):
         if instance is None:  # pragma: no cover
             return self
-        if self.cache is None:
-            cache = instance.__dict__
-            key = self.name
-        else:
-            cache = self.cache
-            key = instance if self.key is None else self.key(self, instance, owner)
+        cache = instance.__dict__
+        key = self.name
         try:
             return cache[key]
         except KeyError:
             result = self.getter(instance)
             cache[key] = result
             return result
-
-
-class WeakrefCachedProperty(CachedProperty):
-    def __init__(self, getter):
-        super().__init__(getter, cache=WeakKeyDictionary())
