@@ -1,5 +1,7 @@
 # cherrymusic-rewrite
 
+[![Build Status](https://travis-ci.org/tilboerner/cherrymusic-rewrite.svg?branch=master)](https://travis-ci.org/tilboerner/cherrymusic-rewrite)
+
 Experimental project to rewrite the [CherryMusic streaming server][]
 in modern, clean code, to make it more maintainable and extensible.
 
