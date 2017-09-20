@@ -29,7 +29,7 @@ def tempdir(*paths, links=None):
         yield pathlib.Path(tmp_path)
 
 
-def create_path(path_str, *, parent_dir=None):
+def create_path(path_str, *, parent_dir=None, is_dir=None):
     """Make sure the given path exists as a file or directory
 
     Intermediate directories will be created if necessary.
@@ -49,8 +49,12 @@ def create_path(path_str, *, parent_dir=None):
     assert not (parent_dir and os.path.isabs(path_str))
     if parent_dir:
         path_str = os.path.join(parent_dir, path_str)
-    dirpath, basename = os.path.split(path_str)  # path_str ending in '/' will be all dirpath
     path = pathlib.Path(path_str)
+    if is_dir is True:
+        path_str = os.path.join(path_str, '')  # ensure trailing os.path.sep
+    elif is_dir is False:
+        path_str = path_str.rstrip(os.path.sep)  # remove trailing os.path.sep
+    dirpath, basename = os.path.split(path_str)  # path_str ending in '/' will be all dirpath
     if dirpath:
         pathlib.Path(dirpath).mkdir(parents=True, exist_ok=True)
     if basename:
