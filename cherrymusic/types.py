@@ -1,17 +1,19 @@
 # -*- coding: UTF-8 -*-
-from collections import MutableMapping
 from types import SimpleNamespace
-from weakref import WeakKeyDictionary
 
 
 class ImmutableNamespace(SimpleNamespace):
+    """A kind of :cls:`types.SimpleNamespace` that can't change attributes after initialization"""
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def __setattr__(self, key, value):
+        # SimpleNamespace does not use __setattr__ on initialization
         raise AttributeError(f"Can't set {type(self).__name__}.{key}, attributes are readonly.")
-        # SimpleNamespace does not use __setattr__ on initialization. Implementation detail?
+
+    def __delattr__(self, key):
+        raise AttributeError(f"Can't del {type(self).__name__}.{key}, attributes are readonly.")
 
 
 class CachedProperty:
