@@ -17,7 +17,7 @@ class ImmutableNamespace(SimpleNamespace):
 
 
 class CachedProperty:
-    """A descriptor that shadows itself in the instance dict with the value of the first access
+    """A descriptor that replaces itself with the return value of the first access
 
     It works like a regular property, but does not define `__set__` and `__delete__` methods, which
     means Python will try to access actual instance attributes before falling back to the
@@ -30,7 +30,6 @@ class CachedProperty:
 
     Note:
         This only works for classes whose instances have a writable `__dict__`.
-        You can use a different cache (and key function) by using the respective init kwargs.
 
     Args:
         getter: A function to determine the value of the property; it will receive the instance
@@ -56,3 +55,10 @@ class CachedProperty:
             result = self.getter(instance)
             cache[key] = result
             return result
+
+
+def sentinel(name):
+    """Create one-off objects with a useful repr"""
+    def __repr__(_):
+        return f'<{name}>'
+    return type(name, (), {'__repr__': __repr__})()
