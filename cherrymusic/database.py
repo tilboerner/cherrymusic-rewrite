@@ -18,7 +18,7 @@ class SessionError(Exception):
 
 class ISOLATION(Enum):
     DEFAULT = sentinel('DEFAULT')
-    AUTOCOMMIT = "AUTOCOMMIT"
+    AUTOCOMMIT = None
     DEFERRED = "DEFERRED"
     IMMEDIATE = "IMMEDIATE"
     EXCLUSIVE = "EXCLUSIVE"
@@ -68,11 +68,8 @@ class SqliteDatabase:
         if target != ':memory:':
             self._ensure_db_dir()
         kwargs = {}
-        if isolation != ISOLATION.DEFAULT:
-            if isolation == ISOLATION.AUTOCOMMIT:
-                kwargs['isolation_level'] = None
-            else:
-                kwargs['isolation_level'] = isolation.value
+        if isolation is not ISOLATION.DEFAULT:
+            kwargs['isolation_level'] = isolation.value
         if timeout_secs is not None:
             kwargs['timeout'] = timeout_secs
         return sqlite3.connect(target, **kwargs)
@@ -115,7 +112,6 @@ class SqliteSession:
         isolation = self.isolation
         if isolation not in {ISOLATION.DEFAULT, ISOLATION.AUTOCOMMIT}:
             self.execute(f'BEGIN {isolation.value}')
-
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
