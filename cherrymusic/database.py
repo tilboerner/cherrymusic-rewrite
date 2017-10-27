@@ -263,3 +263,79 @@ class SqliteView:
     def _fetch_all_items_from_cursor(cursor):
         cursor.row_factory = SqliteView.get_row_factory(cursor)
         return cursor.fetchall()
+
+
+def get_module_database(owner_module):
+    return SqliteDatabase(owner_module.__name__)
+
+
+def apply_migration_to_db(migration, db, *, backward=False):
+    with db.session(isolation=ISOLATION.EXCLUSIVE, timeout_secs=0) as session:
+        session.execute("""
+            CREATE TABLE IF NOT EXISTS _versions(name, comment, direction, applied_at_utc)
+        """)
+        steps = migration.backward_steps if backward else migration.forward_steps
+
+        for step in steps(session):
+            step()
+
+        from datetime import datetime
+        version = {
+            'name': migration.name,
+            'comment': migration.comment,
+            'direction': 'BACKWARD' if backward else 'FORWARD',
+            'applied_at_utc': datetime.utcnow().isoformat()
+        }
+        session.execute(
+            """
+              INSERT INTO _versions(name, comment, direction, applied_at_utc)
+              VALUES (:name, :comment, :direction, :applied_at_utc);
+            """,
+            version
+        )
+
+
+def load_migrations(owner_module):
+    from importlib import import_module
+    owner_name = owner_module.__name__
+
+    # get owner's migrations package
+    migrations_package_name = f'{owner_name}.migrations'
+    try:
+        import sys
+        migrations_package = sys.modules[migrations_package_name]
+    except KeyError:
+        migrations_package = import_module(migrations_package_name)
+    assert hasattr(migrations_package, '__file__')  # must not be namespace package
+    assert hasattr(migrations_package, '__path__')  # must be package
+
+    # scan migrations package dir for eligible .py files
+    migration_dir = os.path.dirname(migrations_package.__file__)
+    migration_names = []
+    for dir_entry in os.scandir(migration_dir):
+        name = dir_entry.name
+        if dir_entry.is_file() and name[0] not in '~_.' and name.endswith('.py'):
+            migration_name, _ = name.rsplit('.', 1)
+            migration_names.append(migration_name)
+
+    # load migration modules from found names
+    for migration_name in sorted(migration_names):
+        migration_module = import_module(migrations_package_name + '.' + migration_name)
+        assert issubclass(getattr(migration_module, 'Migration', None), Migration)
+        yield migration_module.Migration(migration_name, owner_name)
+
+
+class Migration:
+
+    def __init__(self, name, module_name):
+        if '_' in name[1:]:
+            self.name, self.comment = name.split('_', 1)
+        else:
+            self.name, self.comment = name, ''
+        self.module_name = module_name
+
+    def forward_steps(self):
+        raise NotImplementedError
+
+    def backward_steps(self):
+        raise NotImplementedError
