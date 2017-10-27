@@ -4,7 +4,7 @@ import os
 import pytest
 
 from cherrymusic import files
-from cherrymusic.test.helpers import tempdir
+from cherrymusic.common.test.helpers import tempdir
 
 
 def test_path_attributes():

@@ -1,7 +1,7 @@
 # -*- coding: UTF-8 -*-
 import pytest
 
-from cherrymusic import types
+from cherrymusic.common import types
 
 
 def test_immutablenamespace():

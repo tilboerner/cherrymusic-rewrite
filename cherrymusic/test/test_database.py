@@ -7,8 +7,8 @@ from unittest import mock
 import pytest
 
 from cherrymusic import database
+from cherrymusic.common.test import helpers
 from cherrymusic.database import ISOLATION
-from cherrymusic.test import helpers
 
 
 def test_sqlitedatabase():

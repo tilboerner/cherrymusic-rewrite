@@ -4,8 +4,7 @@ import os
 import pathlib
 import sys
 
-from cherrymusic.types import ImmutableNamespace, CachedProperty
-
+from cherrymusic.common.types import CachedProperty, ImmutableNamespace
 
 log = logging.getLogger(__name__)
 

@@ -4,10 +4,9 @@ import pathlib
 import sqlite3
 import threading
 from contextlib import closing
-
 from enum import Enum
 
-from cherrymusic.types import sentinel
+from cherrymusic.common.types import sentinel
 
 DB_BASEDIR = '/tmp/data/cherrymusic/db'
 
