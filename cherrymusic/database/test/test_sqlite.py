@@ -6,22 +6,22 @@ from unittest import mock
 
 import pytest
 
-from cherrymusic import database
 from cherrymusic.common.test import helpers
-from cherrymusic.database import ISOLATION
+from cherrymusic.database import sqlite
+from cherrymusic.database.sqlite import ISOLATION
 
 
 def test_sqlitedatabase():
-    db = database.SqliteDatabase(':memory:')
+    db = sqlite.SqliteDatabase(':memory:')
     with db.connect() as connection:
         assert isinstance(connection, sqlite3.Connection)
     with db.session() as session:
-        assert isinstance(session, database.SqliteSession)
+        assert isinstance(session, sqlite.SqliteSession)
 
 
 def _testdb(name=':memory:', *statements):
     """Create a SqliteDatabase and run some initial statements"""
-    db = database.SqliteDatabase(name if name == ':memory:' else f'testdb.{name}')
+    db = sqlite.SqliteDatabase(name if name == ':memory:' else f'testdb.{name}')
     with db.connect() as conn:
         with closing(conn.cursor()) as cursor:
             for stmt in statements:
@@ -35,7 +35,7 @@ def _temp_db_dir(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
         with helpers.tempdir() as tempdir:
-            with mock.patch.object(database, 'DB_BASEDIR', tempdir):
+            with mock.patch.object(sqlite, 'DB_BASEDIR', tempdir):
                 func(*args, **kwargs)
 
     return wrapper
@@ -45,10 +45,10 @@ def test_session_errors_when_not_in_context():
     db = _testdb()
     session = db.session()
 
-    with pytest.raises(database.SessionError):
+    with pytest.raises(sqlite.SessionError):
         session.commit()
 
-    with pytest.raises(database.SessionError):
+    with pytest.raises(sqlite.SessionError):
         session.execute('SELECT 1;')
 
 
@@ -57,7 +57,7 @@ def test_session_errors_when_nesting():
     session = db.session()
 
     with session:
-        with pytest.raises(database.SessionError):
+        with pytest.raises(sqlite.SessionError):
             with session:
                 pass  # pragma: no cover
 
@@ -72,7 +72,7 @@ def test_session_enforces_threadlocal():
             pass  # pragma: no cover
 
     with ThreadPoolExecutor() as executor:
-        with pytest.raises(database.SessionError):
+        with pytest.raises(sqlite.SessionError):
             executor.submit(use_session, session).result()
 
 
