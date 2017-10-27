@@ -3,8 +3,8 @@ import os
 import pathlib
 import sqlite3
 import threading
+from collections import defaultdict
 from contextlib import closing
-
 from enum import Enum
 
 from cherrymusic.types import sentinel
@@ -33,8 +33,23 @@ class SqliteDatabase:
             separators and appending `.sqlite`. Use ':memory:' for an in-memory database.
     """
 
-    def __init__(self, qualname):
+    _connection_hooks = defaultdict(list)
 
+    @classmethod
+    def connection_hook(cls, module):
+        qualname = module if isinstance(module, str) else module.__name__
+
+        def decorator(func):
+            cls.register_connection_hook(qualname, func)
+            return func
+
+        return decorator
+
+    @classmethod
+    def register_connection_hook(cls, qualname, hook):
+        cls._connection_hooks[qualname].append(hook)
+
+    def __init__(self, qualname):
         self.qualname = qualname
         if qualname == ':memory:':
             self.db_path = ':memory:'
@@ -79,7 +94,18 @@ class SqliteDatabase:
             kwargs['isolation_level'] = isolation.value
         if timeout_secs is not None:
             kwargs['timeout'] = timeout_secs
-        return sqlite3.connect(target, **kwargs)
+
+        connection = sqlite3.connect(target, **kwargs)
+
+        for hook in self.connection_hooks:
+            hook(connection)
+
+        return connection
+
+    @property
+    def connection_hooks(self):
+        if self.qualname in self._connection_hooks:
+            yield from self._connection_hooks[self.qualname]
 
     def _ensure_db_dir(self):
         db_dir, db_file = os.path.split(self.db_path)
