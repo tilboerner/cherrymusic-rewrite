@@ -5,15 +5,11 @@ from types import SimpleNamespace
 class ImmutableNamespace(SimpleNamespace):
     """A kind of :cls:`types.SimpleNamespace` that can't change attributes after initialization"""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def __setattr__(self, key, value):
+    def __setattr__(self, key, *args, **kwargs):
         # SimpleNamespace does not use __setattr__ on initialization
-        raise AttributeError(f"Can't set {type(self).__name__}.{key}, attributes are readonly.")
+        raise AttributeError(f"Can't modify {type(self).__name__}.{key}, attributes are read-only.")
 
-    def __delattr__(self, key):
-        raise AttributeError(f"Can't del {type(self).__name__}.{key}, attributes are readonly.")
+    __delattr__ = __setattr__
 
 
 class CachedProperty:
@@ -58,7 +54,7 @@ class CachedProperty:
 
 
 def sentinel(name):
-    """Create one-off objects with a useful repr"""
+    """A unique, one-off object with a useful repr"""
     def __repr__(_):
         return f'<{name}>'
     return type(name, (), {'__repr__': __repr__})()
