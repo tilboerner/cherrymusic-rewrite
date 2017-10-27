@@ -4,13 +4,15 @@ import os
 import pathlib
 import sys
 
-from cherrymusic.types import ImmutableNamespace, CachedProperty
-
+from cherrymusic.data import DataModel, DerivedField, Field
 
 log = logging.getLogger(__name__)
 
 
-class Path(ImmutableNamespace):
+class Path(DataModel):
+
+    name = Field(str, empty=True)
+    parent = Field(str, empty=True)
 
     def __init__(self, name, *, parent=None, **kwargs):
         is_simple_name = (
@@ -37,7 +39,7 @@ class Path(ImmutableNamespace):
         name = sys.intern(name)
         super().__init__(name=name, parent=parent, **kwargs)
 
-    @CachedProperty
+    @DerivedField
     def depth(self):
         ppath = pathlib.PurePath(self)
         if ppath.root or ppath.drive:
@@ -46,18 +48,18 @@ class Path(ImmutableNamespace):
             pparts = ppath.parts
         return sum(-1 if p == '..' else 1 for p in pparts)  # '.' is never in PurePath.parts
 
-    @CachedProperty
+    @DerivedField
     def is_dir(self):
         return os.path.isdir(self)
 
-    @CachedProperty
+    @DerivedField
     def is_symlink(self):
         return os.path.islink(self)
 
     def make_child(self, other, **kwargs):
         return type(self)(other, parent=self, **kwargs)
 
-    @CachedProperty
+    @DerivedField
     def path(self):  # may contain surrogates from errors='surrogateescape')
         # since self.name and self.parent are normalized, we can concat instead of os.path.join
         parent, name = self.parent, self.name
