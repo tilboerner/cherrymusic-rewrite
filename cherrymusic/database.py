@@ -6,6 +6,7 @@ import threading
 from collections import defaultdict
 from contextlib import closing
 from enum import Enum
+from operator import itemgetter
 
 from cherrymusic.types import sentinel
 
@@ -194,3 +195,71 @@ class SqliteSession:
             timeout_secs=self.timeout_secs,
         )
         return conn
+
+
+class SqliteView:
+
+    @classmethod
+    def from_sql_func(cls, func):
+        return type(func.__name__, (cls,), {'make_query': staticmethod(func)})
+
+    def __init__(self, executor, qualname):
+        self.executor = executor
+        self.qualname = qualname
+
+    def make_query(self, **kwargs):
+        qualname = self.qualname
+        param_names = sorted(kwargs)
+        param_values = tuple(kwargs[name] for name in param_names)
+        if param_names:
+            clauses = ' AND '.join(f'{name} = ?' for name in param_names)
+            sql = f'SELECT * FROM {qualname} WHERE {clauses}'
+        else:
+            sql = f'SELECT * FROM {qualname}'
+        return sql, param_values
+
+    def select_one(self, *args, **kwargs):
+        sql, params = self.make_query(*args, **kwargs)
+        result = self.executor.execute(
+            sql,
+            params,
+            cursor_callback=self._fetch_single_item_from_cursor,
+        )
+        if result is not None:
+            return next(self.process_results([result]))
+
+    def select_all(self, *args, **kwargs):
+        sql, params = self.make_query(*args, **kwargs)
+        results = self.executor.execute(
+            sql,
+            params,
+            cursor_callback=self._fetch_all_items_from_cursor,
+        )
+        return list(self.process_results(results))
+
+    @staticmethod
+    def get_row_factory(cursor):
+        keys = tuple(map(itemgetter(0), cursor.description))
+
+        def row_factory(cursor_, row):
+            assert cursor_ is cursor
+            return dict(zip(keys, row))
+
+        return row_factory
+
+    process_result = staticmethod(lambda r: r)
+
+    @classmethod
+    def process_results(cls, results):
+        process = cls.process_result
+        return (process(r) for r in results)
+
+    @staticmethod
+    def _fetch_single_item_from_cursor(cursor):
+        cursor.row_factory = SqliteView.get_row_factory(cursor)
+        return cursor.fetchone()
+
+    @staticmethod
+    def _fetch_all_items_from_cursor(cursor):
+        cursor.row_factory = SqliteView.get_row_factory(cursor)
+        return cursor.fetchall()
