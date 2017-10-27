@@ -1,6 +1,8 @@
 # -*- coding: UTF-8 -*-
 from types import SimpleNamespace
 
+import threading
+
 
 class ImmutableNamespace(SimpleNamespace):
     """A kind of :cls:`types.SimpleNamespace` that can't change attributes after initialization"""
@@ -58,3 +60,42 @@ def sentinel(name):
     def __repr__(_):
         return f'<{name}>'
     return type(name, (), {'__repr__': __repr__})()
+
+
+class MemoizedProperty:
+
+    def __init__(self, getter):
+        from weakref import WeakKeyDictionary
+        self.cache = WeakKeyDictionary
+        self.getter = getter
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        cache = self.cache
+        try:
+            return cache[instance]
+        except KeyError:
+            cache[instance] = value = self.getter(instance)
+            return value
+
+
+def memoized_method(getter):
+    from functools import wraps
+    from weakref import WeakKeyDictionary
+    cache = WeakKeyDictionary()
+    local = threading.local()
+
+    @wraps(getter)
+    def wrapper(instance):
+        if hasattr(local, 'active'):
+            return getter(instance)
+        local.active = True
+        try:
+            return cache[instance]
+        except KeyError:
+            cache[instance] = value = getter(instance)
+            return value
+        finally:
+            del local.active
+    return wrapper
