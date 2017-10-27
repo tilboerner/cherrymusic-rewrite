@@ -46,6 +46,13 @@ class SqliteDatabase:
         clsname = type(self).__name__
         return f'{clsname}({self.qualname!r})'
 
+    def execute(self, sql, params=(), *, isolation=ISOLATION.DEFAULT, cursor_callback=None):
+        with self.session(isolation=isolation) as session:
+            kwargs = {}
+            if cursor_callback:
+                kwargs['cursor_callback'] = cursor_callback
+            return session.execute(sql, params, **kwargs)
+
     def session(self, **kwargs):
         return SqliteSession(self, **kwargs)
 
