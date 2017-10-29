@@ -108,7 +108,7 @@ def test_path_string_attributes_are_interned():
 
 
 def test_recursive_scandir():
-    with tempdir('file', 'dir/subfile') as tmp_path:
+    with tempdir('file', 'dir/', 'dir/subfile') as tmp_path:
         found_paths = {str(p): p for p in files.recursive_scandir(tmp_path)}
 
     assert found_paths.keys() == {'file', 'dir', 'dir/subfile'}

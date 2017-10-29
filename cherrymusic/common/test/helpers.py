@@ -23,20 +23,21 @@ def tempdir(*paths, links=None):
     links = links or {}
     with tempfile.TemporaryDirectory() as tmp_path:
         for path in paths:
-            create_path(path, parent_dir=tmp_path)
+            create_path(path, parent_dir=tmp_path, is_dir=path.endswith('/'))
         for link, target in links.items():
-            create_symlink_to_target(link, target, parent_dir=tmp_path)
+            create_symlink_to_target(link, target, parent_dir=tmp_path, is_dir=link.endswith('/'))
         yield pathlib.Path(tmp_path)
 
 
-def create_path(path_str, *, parent_dir=None, is_dir=None):
+def create_path(path_str, *, is_dir, parent_dir=None):
     """Make sure the given path exists as a file or directory
 
     Intermediate directories will be created if necessary.
 
     Args:
-        path_str: The path that should exist. If it ends with a '/', make sure it's a directory;
-            otherwise, make sure it's a file.
+        path_str: The path that should exist
+        is_dir: Creates the path as a directory if ``True``, as a file if ``False``;
+            otherwise, evaluates to ``path_str.endswith('/')``
         parent_dir: For convenience, if path_str is relative, you can pass the directory it's
             relative to, and we'll do the join for you
 
@@ -52,20 +53,22 @@ def create_path(path_str, *, parent_dir=None, is_dir=None):
     path = pathlib.Path(path_str)
     if is_dir is True:
         path_str = os.path.join(path_str, '')  # ensure trailing os.path.sep
+        is_right_type = pathlib.Path.is_dir
     elif is_dir is False:
         path_str = path_str.rstrip(os.path.sep)  # remove trailing os.path.sep
+        is_right_type = pathlib.Path.is_file
+    else:
+        is_right_type = getattr(pathlib.Path, 'is_dir' if path_str.endswith('/') else 'is_file')
     dirpath, basename = os.path.split(path_str)  # path_str ending in '/' will be all dirpath
     if dirpath:
         pathlib.Path(dirpath).mkdir(parents=True, exist_ok=True)
     if basename:
         path.touch(exist_ok=True)
-    is_right_type = path.is_dir() if path_str.endswith('/') else path.is_file()
-    if not is_right_type:  # pragma: no cover
-        assert path.exists()
+    assert path.exists() and is_right_type(path)
     return path
 
 
-def create_symlink_to_target(link_path, target_path, *, parent_dir=None):
+def create_symlink_to_target(link_path, target_path, *, is_dir, parent_dir=None):
     """Make sure there is a symlink at the given path, pointing at the given target
 
     Intermediate directories will vbe created if necessary; as will be the target_path, according
@@ -82,7 +85,7 @@ def create_symlink_to_target(link_path, target_path, *, parent_dir=None):
         FileExistsError: If ``link_path`` already exists, but is not a symlink to target_path; or if
             ``target_path`` already exists, but is not the desired type (see :func:`create_path`).
     """
-    target_path = create_path(target_path, parent_dir=parent_dir)
+    target_path = create_path(target_path, parent_dir=parent_dir, is_dir=None)
     link_path = pathlib.Path(os.path.join(parent_dir or '', link_path))
     link_path.parent.mkdir(parents=True, exist_ok=True)
     try:
