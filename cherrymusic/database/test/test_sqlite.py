@@ -15,8 +15,8 @@ def test_sqlitedatabase():
     db = sqlite.SqliteDatabase(':memory:')
     with db.connect() as connection:
         assert isinstance(connection, sqlite3.Connection)
-    with db.session() as session:
-        assert isinstance(session, sqlite.SqliteSession)
+    with db.transaction() as session:
+        assert isinstance(session, sqlite.SqliteTransaction)
 
 
 def _testdb(name=':memory:', *statements):
@@ -41,87 +41,87 @@ def _temp_db_dir(func):
     return wrapper
 
 
-def test_session_errors_when_not_in_context():
+def test_transaction_errors_when_not_in_context():
     db = _testdb()
-    session = db.session()
+    session = db.transaction()
 
-    with pytest.raises(sqlite.SessionError):
+    with pytest.raises(sqlite.TransactionError):
         session.commit()
 
-    with pytest.raises(sqlite.SessionError):
+    with pytest.raises(sqlite.TransactionError):
         session.execute('SELECT 1;')
 
 
-def test_session_errors_when_nesting():
+def test_transaction_errors_when_nesting():
     db = _testdb()
-    session = db.session()
+    session = db.transaction()
 
     with session:
-        with pytest.raises(sqlite.SessionError):
+        with pytest.raises(sqlite.TransactionError):
             with session:
                 pass  # pragma: no cover
 
 
-def test_session_enforces_threadlocal():
+def test_transaction_enforces_threadlocal():
     from concurrent.futures import ThreadPoolExecutor
     db = _testdb()
-    session = db.session()
+    session = db.transaction()
 
     def use_session(s):
         with s:
             pass  # pragma: no cover
 
     with ThreadPoolExecutor() as executor:
-        with pytest.raises(sqlite.SessionError):
+        with pytest.raises(sqlite.TransactionError):
             executor.submit(use_session, session).result()
 
 
 @_temp_db_dir
-def test_session_auto_commit_and_rollback():
+def test_transaction_auto_commit_and_rollback():
     db = _testdb('autosession', 'CREATE TABLE test(a)');
 
-    with db.session() as session:
+    with db.transaction() as session:
         session.execute('INSERT INTO test VALUES(1);')
     with pytest.raises(Exception):
-        with db.session() as session:
+        with db.transaction() as session:
             session.execute('INSERT INTO test VALUES(2);')
             raise Exception
 
-    with db.session() as check:
+    with db.transaction() as check:
         assert check.execute('SELECT * FROM test;') == [(1,)]
 
 
 @_temp_db_dir
-def test_session_isolation():
+def test_transaction_isolation():
     # see https://sqlite.org/lang_transaction.html
     db = _testdb('isolation', 'CREATE TABLE test(x);')
 
-    def session(isolation=ISOLATION.DEFAULT):
-        return db.session(isolation=isolation, timeout_secs=0)
+    def txn(isolation=ISOLATION.DEFAULT):
+        return db.transaction(isolation=isolation, timeout_secs=0)
 
-    with session(ISOLATION.EXCLUSIVE), session() as other:  # EXCLUSIVE lock
+    with txn(ISOLATION.EXCLUSIVE), txn() as other:  # EXCLUSIVE lock
         with pytest.raises(sqlite3.OperationalError):
             other.execute('SELECT * FROM test;')
 
         with pytest.raises(sqlite3.OperationalError):
-            with session(ISOLATION.EXCLUSIVE):
+            with txn(ISOLATION.EXCLUSIVE):
                 pass  # pragma: no cover
 
         with pytest.raises(sqlite3.OperationalError):
-            with session(ISOLATION.IMMEDIATE):
+            with txn(ISOLATION.IMMEDIATE):
                 pass  # pragma: no cover
 
-    with session(ISOLATION.IMMEDIATE) as test_session, session() as other:  # RESERVED lock
+    with txn(ISOLATION.IMMEDIATE) as test_transaction, txn() as other:  # RESERVED lock
         other.execute('SELECT * FROM test;')
 
         with pytest.raises(sqlite3.OperationalError):
             other.execute('INSERT INTO test VALUES (1);')
 
-        test_session.execute('INSERT INTO test VALUES (2);')
+        test_transaction.execute('INSERT INTO test VALUES (2);')
         assert other.execute('SELECT * FROM test;') == []
 
-    with session(ISOLATION.AUTOCOMMIT) as test_session, session() as other:
+    with txn(ISOLATION.AUTOCOMMIT) as test_transaction, txn() as other:
         other.execute('SELECT * FROM test;')
-        test_session.execute('INSERT INTO test VALUES (3);')
+        test_transaction.execute('INSERT INTO test VALUES (3);')
 
         assert other.execute('SELECT * FROM test;') == [(2,), (3,)]

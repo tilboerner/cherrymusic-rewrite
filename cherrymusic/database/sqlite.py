@@ -11,7 +11,7 @@ from cherrymusic.common.types import sentinel
 DB_BASEDIR = '/tmp/data/cherrymusic/db'
 
 
-class SessionError(Exception):
+class TransactionError(Exception):
     pass
 
 
@@ -45,8 +45,8 @@ class SqliteDatabase:
         clsname = type(self).__name__
         return f'{clsname}({self.qualname!r})'
 
-    def session(self, **kwargs):
-        return SqliteSession(self, **kwargs)
+    def transaction(self, **kwargs):
+        return SqliteTransaction(self, **kwargs)
 
     def connect(self, *, isolation=ISOLATION.DEFAULT, timeout_secs=None):
         """Create a connection to the SQLite database represented by this instance
@@ -79,7 +79,7 @@ class SqliteDatabase:
             pathlib.Path(db_dir).mkdir(mode=0o700, parents=True, exist_ok=True)
 
 
-class SqliteSession:
+class SqliteTransaction:
     """Context manager that wraps an sqlite3.Connection, with commit or rollback on exit
 
     ..note:: Session contexts can not be nested.
@@ -116,7 +116,7 @@ class SqliteSession:
     def __exit__(self, exc_type, exc_val, exc_tb):
         connection = self._connection(may_be_none=True)
         try:
-            if connection and connection.in_transaction:  # session is open with uncommitted changes
+            if connection and connection.in_transaction:  # transaction is open with uncommitted changes
                 if exc_type or exc_val:
                     connection.rollback()
                 else:
@@ -125,14 +125,14 @@ class SqliteSession:
             self.close()
 
     def close(self):
-        """Close the session manually before leaving context, discarding any pending changes"""
+        """Close the transaction manually before leaving context, discarding any pending changes"""
         conn = self._connection(may_be_none=True)
         self.__local.connection = None
         if conn:
             conn.close()
 
     def commit(self):
-        """Manually commit any pending changes during the session"""
+        """Manually commit any pending changes during the transaction"""
         self._connection().commit()
 
     def execute(self, sql, params=(), cursor_callback=sqlite3.Cursor.fetchall):
@@ -141,20 +141,20 @@ class SqliteSession:
             return cursor_callback(cursor)
 
     def _connection(self, *, may_be_none=False):
-        """Return the active session's db connection, or raise appropriate errors"""
+        """Return the active transaction's db connection, or raise appropriate errors"""
         try:
             conn = self.__local.connection
         except AttributeError:
-            raise SessionError(f'Do not share sessions accross threads! ({self})') from None
+            raise TransactionError(f'Do not share sessions accross threads! ({self})') from None
         if conn is None and not may_be_none:
-            raise SessionError(f'Do not call outside of session context! ({self})')
+            raise TransactionError(f'Do not call outside of transaction context! ({self})')
         return conn
 
     def _create_connection_once(self):
-        """Create the db connection for the session, or raise an error when one already exists"""
+        """Create the db connection for the transaction, or raise an error when one already exists"""
         conn = self._connection(may_be_none=True)
         if conn is not None:
-            raise SessionError(f'Sessions cannot be nested! ({self})')
+            raise TransactionError(f'Sessions cannot be nested! ({self})')
         conn = self.__local.connection = self.database.connect(
             isolation=self.isolation,
             timeout_secs=self.timeout_secs,
