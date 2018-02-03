@@ -4,7 +4,6 @@ import pathlib
 import sqlite3
 import threading
 from contextlib import closing
-
 from enum import Enum
 
 from cherrymusic.types import sentinel
@@ -25,7 +24,7 @@ class ISOLATION(Enum):
 
 
 class SqliteDatabase:
-    """Simple OOP Wrapper for a SQLite database
+    """Simple OOP Wrapper for a SQLite database.
 
     Args:
         qualname: The qualified name of the database consists of a number of names separated by
@@ -50,7 +49,7 @@ class SqliteDatabase:
         return SqliteSession(self, **kwargs)
 
     def connect(self, *, isolation=ISOLATION.DEFAULT, timeout_secs=None):
-        """Create a connection to the SQLite database represented by this instance
+        """Create a connection to the SQLite database represented by this instance.
 
         Args:
             isolation: Isolation mode; same default as sqlite3.connect
@@ -63,6 +62,7 @@ class SqliteDatabase:
             - https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
             - https://docs.python.org/3/library/sqlite3.html#sqlite3-controlling-transactions
             - https://sqlite.org/lang_transaction.html
+
         """
         target = self.db_path
         if target != ':memory:':
@@ -81,7 +81,7 @@ class SqliteDatabase:
 
 
 class SqliteSession:
-    """Context manager that wraps an sqlite3.Connection, with commit or rollback on exit
+    """Context manager that wraps an sqlite3.Connection, with commit or rollback on exit.
 
     ..note:: Session contexts can not be nested.
     """

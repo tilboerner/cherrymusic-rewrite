@@ -78,7 +78,7 @@ def test_session_enforces_threadlocal():
 
 @_temp_db_dir
 def test_session_auto_commit_and_rollback():
-    db = _testdb('autosession', 'CREATE TABLE test(a)');
+    db = _testdb('autosession', 'CREATE TABLE test(a)')
 
     with db.session() as session:
         session.execute('INSERT INTO test VALUES(1);')

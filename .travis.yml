@@ -5,13 +5,32 @@
 #
 
 language: python
+sudo: false
+cache:
+  - pip
 
 python:
   - "3.6"
   - "3.6-dev"
   - "3.7-dev"
 
-install:
-  - pip install -r requirements-test.txt
+env:
+  - TOXENV=py3
 
-script: pytest --cov --verbose
+matrix:
+  include:
+    - env: TOXENV=isort
+    - env: TOXENV=codestyle
+    - env: TOXENV=docstyle
+  allow_failures:
+    - python: "3.6-dev"
+    - python: "3.7-dev"
+  fast_finish: true
+
+install:
+  - pip install --upgrade pip tox
+
+before_script:
+  - echo $TOXENV
+
+script: tox -e $TOXENV

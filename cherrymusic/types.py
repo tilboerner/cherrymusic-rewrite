@@ -54,7 +54,7 @@ class CachedProperty:
 
 
 def sentinel(name):
-    """A unique, one-off object with a useful repr"""
+    """Create a unique, one-off object with a useful repr"""
     def __repr__(_):
         return f'<{name}>'
     return type(name, (), {'__repr__': __repr__})()
