@@ -14,4 +14,4 @@ python:
 install:
   - pip install -r requirements-test.txt
 
-script: pytest --cov --verbose
+script: pytest --cov ---cov-fail-under=50 -verbose

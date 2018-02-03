@@ -15,18 +15,17 @@ def mock_registry():
 
 
 # noinspection PyUnusedLocal,PyShadowingNames
-def test_component_instance_registration(mock_registry):
+def test_component_registration(mock_registry):
 
     class LocalComponent(Component):
         pass
 
-    component = mock_registry[__package__]
+    component = mock_registry['core.test']
 
-    assert isinstance(component, LocalComponent)
+    assert component is LocalComponent
     parent_module = sys.modules[__package__]
-    assert component.package is parent_module
-    assert component.namespace == __package__
     assert component.pkg_name == __package__
+    assert component.namespace == 'core.test'
 
     with pytest.raises(ValueError):
         class LocalComponentWithSameNamespace(Component):
@@ -49,11 +48,11 @@ def test_component_may_register_same_type_again(mock_registry):
     class LocalComponent(Component):
         pass
 
-    component = mock_registry[__package__]
+    component = mock_registry['core.test']
 
     # all of the following should be allowed:
     ComponentType.register(component)
-    ComponentType.register(LocalComponent(package=component.package))
+    ComponentType.register(LocalComponent)
     ComponentType(LocalComponent.__name__, (Component,), {})  # same name, defined in same module
 
 

@@ -2,6 +2,7 @@
 
 """Standards for look and behavior of concrete, functional parts of the system"""
 import logging
+import operator
 import sys
 from importlib import import_module
 from operator import attrgetter
@@ -14,23 +15,60 @@ log = logging.getLogger(__name__)
 _registry = {}
 
 
+def _fix_namespace(namespace):
+    if namespace.startswith('cherrymusic.'):
+        namespace = namespace[len('cherrymusic.'):]
+    else:
+        namespace = '_.' + namespace
+    assert namespace and '.' not in {namespace[0], namespace[-1]}
+    return namespace
+
+
+def _unfix_namespace(namespace):
+    if namespace[:2] == '_.':
+        return namespace[:2]
+    return 'cherrymusic.' + namespace
+
+
 def iter_components():
     yield from _registry.values()
+
+
+def get(namespace):
+    namespace = _fix_namespace(namespace)
+    try:
+        return _registry[namespace]
+    except KeyError:
+        pkg_name = _unfix_namespace(namespace)
+        module_name = pkg_name + '.components'
+        try:
+            import_module(module_name)
+            return _registry[namespace]
+        except KeyError:  # pragma: no cover
+            raise ImportError(f'{module_name} does not define a Component class') from None
+
+
+get_component = get
 
 
 class ComponentType(type):
     """Metaclass that instantiates and collects component classes as they are defined"""
 
     def __new__(mcs, name, bases, namespace):
+        dependencies = tuple(namespace.pop('depends', ()))
+        assert all(
+            isinstance(d, ComponentType) or isinstance(d, tuple) and isinstance(d[0], ComponentType)
+            for d in dependencies
+        )
+        namespace['depends'] = dependencies
         cls = super().__new__(mcs, name, bases, namespace)
         pkg = mcs.get_component_package(cls)
         # always make sure namespace and pkg_name are set on every class:
-        if 'namespace' not in namespace:
-            cls.namespace = pkg.__name__
-        if 'pkg_name' not in namespace:
+        if not namespace.get('namespace'):
+            cls.namespace = _fix_namespace(namespace.get('namespace') or pkg.__name__)
+        if not namespace.get('pkg_name'):
             cls.pkg_name = pkg.__name__
-        instance = cls(package=pkg)
-        mcs.register(instance)
+        mcs.register(cls)
         return cls
 
     @classmethod
@@ -77,8 +115,8 @@ class ComponentType(type):
         key = component.namespace
         if key in _registry:
             old = _registry[key]
-            if str(type(old)) == str(type(component)):  # check str in case cls got reloaded
-                log.debug(f'Allowing component re-registration: {component.__class__}')
+            if str(old) == str(component):  # check str representation in case cls got reloaded
+                log.debug(f'Allowing component re-registration: {component}')
             else:
                 raise ValueError(f"Can't register {component} as {key!r}: already in use by {old}")
         _registry[key] = component
@@ -92,17 +130,25 @@ class Component(ImmutableNamespace, metaclass=ComponentType):
     database space.
     """
 
+    abstract: bool = True
+
     pkg_name: str = None
     """Importable name of the package described by the component (default set by metaclass)"""
 
     namespace: str = None
     """Namespace prefix used by the component (default set by metaclass)"""
 
-    def __init__(self, *, package, **kwargs):
-        super().__init__(package=package, **kwargs)
+    depends = ()
+    """Sequence of Component subclasses whose instances this component will use"""
+
+    def __init__(self, **dependencies):
+        super().__init__(**dependencies)
 
     def __hash__(self):
         return hash(id(self))
+
+    def __eq__(self, other):
+        return self is other
 
     def set_up(self):  # pragma: no cover
         pass
@@ -115,10 +161,34 @@ class Component(ImmutableNamespace, metaclass=ComponentType):
         self.set_up()
 
 
+def init_components():
+    comps = {}
+    for comp_cls in iter_components():
+        if comp_cls.__dict__.get('abstract'):  # ignore abstract attribute of superclasses
+            continue
+        deps = {}
+        for dep_info in comp_cls.depends:
+            dep_cls, *rest = dep_info
+            if rest:
+                dep_name, = rest  # unpack single rest
+            else:
+                dep_name = dep_cls.namespace.split('.')[-1]
+            if dep_name in deps:
+                raise ValueError(f'Dependency name conflict:'
+                                 f' {dep_name} is {type(deps[dep_name])} and {dep_cls}')
+            dep_instance = comps[dep_cls.namespace]
+            deps[dep_name] = dep_instance
+        comps[comp_cls.namespace] = comp_cls(**deps)
+    return comps
+
+
 class Components:
 
+    def __init__(self):
+        self._comps = init_components()
+
     def __iter__(self):
-        return iter_components()
+        yield from self._comps.values()
 
     def __getattr__(self, name):
         # Treat unknown attributes as component methods
@@ -127,6 +197,7 @@ class Components:
         def apply_to_all(*args, **kwargs):
             for component in self:
                 method = get_method(component)
+                log.info('%s: %s', component.namespace, getattr(method, '__name__', method))
                 method(*args, **kwargs)
 
         setattr(self, name, apply_to_all)
