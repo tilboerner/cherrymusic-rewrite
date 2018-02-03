@@ -111,6 +111,7 @@ class ComponentType(type):
 
         Raises:
             ValueError: if a different component is already registered under the same namespace
+
         """
         key = component.namespace
         if key in _registry:

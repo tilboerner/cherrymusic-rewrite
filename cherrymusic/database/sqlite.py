@@ -24,7 +24,7 @@ class ISOLATION(Enum):
 
 
 class SqliteDatabase:
-    """Simple OOP Wrapper for a SQLite database
+    """Simple OOP Wrapper for a SQLite database.
 
     Args:
         qualname: The qualified name of the database consists of a number of names separated by
@@ -49,7 +49,7 @@ class SqliteDatabase:
         return SqliteTransaction(self, **kwargs)
 
     def connect(self, *, isolation=ISOLATION.DEFAULT, timeout_secs=None):
-        """Create a connection to the SQLite database represented by this instance
+        """Create a connection to the SQLite database represented by this instance.
 
         Args:
             isolation: Isolation mode; same default as sqlite3.connect
@@ -62,6 +62,7 @@ class SqliteDatabase:
             - https://docs.python.org/3/library/sqlite3.html#sqlite3.connect
             - https://docs.python.org/3/library/sqlite3.html#sqlite3-controlling-transactions
             - https://sqlite.org/lang_transaction.html
+
         """
         target = self.db_path
         if target != ':memory:':
@@ -80,7 +81,7 @@ class SqliteDatabase:
 
 
 class SqliteTransaction:
-    """Context manager that wraps an sqlite3.Connection, with commit or rollback on exit
+    """Context manager that wraps an sqlite3.Connection, with commit or rollback on exit.
 
     ..note:: Session contexts can not be nested.
     """
@@ -116,7 +117,7 @@ class SqliteTransaction:
     def __exit__(self, exc_type, exc_val, exc_tb):
         connection = self._connection(may_be_none=True)
         try:
-            if connection and connection.in_transaction:  # transaction is open with uncommitted changes
+            if connection and connection.in_transaction:  # transaction with uncommitted changes
                 if exc_type or exc_val:
                     connection.rollback()
                 else:
@@ -151,7 +152,7 @@ class SqliteTransaction:
         return conn
 
     def _create_connection_once(self):
-        """Create the db connection for the transaction, or raise an error when one already exists"""
+        """Create the db connection for the transaction or raise an error when one already exists"""
         conn = self._connection(may_be_none=True)
         if conn is not None:
             raise TransactionError(f'Sessions cannot be nested! ({self})')

@@ -42,4 +42,3 @@ def test_cachedproperty():
 
     with pytest.raises(AttributeError):
         del Class().value       # instance attribute does not exist before descriptor call
-
