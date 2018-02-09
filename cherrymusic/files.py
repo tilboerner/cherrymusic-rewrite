@@ -16,7 +16,7 @@ class Path(ImmutableNamespace):
             isinstance(name, str) and
             name not in ('', '.', '..') and
             os.path.sep not in name and
-            (not os.path.altsep or os.path.altsep not in name)
+            not (os.path.altsep and os.path.altsep in name)
         )
         if is_simple_name and isinstance(parent, Path):
             # happy path: almost no normalization needed, depth can simply be incremented
@@ -90,10 +90,10 @@ class Path(ImmutableNamespace):
 
 def recursive_scandir(path, *, root=None, filters=()):
     if not root:
-        root = path = os.path.abspath(path)
+        root = startpath = os.path.abspath(path)
     else:
         root = os.path.abspath(root)
-    startpath = os.path.join(root, path)
+        startpath = os.path.join(root, path)
     start = Path(os.path.relpath(startpath, root), is_dir=os.path.isdir(startpath))
 
     # path is not a directory -> no recursion
@@ -105,12 +105,13 @@ def recursive_scandir(path, *, root=None, filters=()):
 
     # path is a directory -> recursive scanning
     if start != '.':
+        # start is not root
         yield start
     dirstack = [start]  # LIFO == depth-first
     while dirstack:
         current = dirstack.pop()
+        scanpath = os.path.join(root, current.path)
         try:
-            scanpath = os.path.join(root, current.path)
             dir_entries = os.scandir(scanpath)
             for entry in dir_entries:
                 child = current.make_child(

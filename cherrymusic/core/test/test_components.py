@@ -32,13 +32,13 @@ def test_component_registration(mock_registry):
             pass
 
     with pytest.raises(ImportError):
-        class LocalComponentWithSameNamespace(Component):
+        class LocalComponentWithUnimportablePkg(Component):
             pkg_name = 'UNIMPORTABLE_MODULE'
 
     class ExtraLocalComponent(Component):
         namespace = 'OTHER_NAMESPACE'
 
-    assert 'OTHER_NAMESPACE' in mock_registry
+    assert '_.OTHER_NAMESPACE' in mock_registry
     assert set(components.iter_components()) == set(mock_registry.values())
 
 

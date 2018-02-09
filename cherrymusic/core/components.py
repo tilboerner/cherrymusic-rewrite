@@ -26,7 +26,7 @@ def _fix_namespace(namespace):
 
 def _unfix_namespace(namespace):
     if namespace[:2] == '_.':
-        return namespace[:2]
+        return namespace[2:]
     return 'cherrymusic.' + namespace
 
 
@@ -42,7 +42,7 @@ def get(namespace):
         pkg_name = _unfix_namespace(namespace)
         module_name = pkg_name + '.components'
         try:
-            import_module(module_name)
+            import_module(module_name)  # this should register the component under namespace
             return _registry[namespace]
         except KeyError:  # pragma: no cover
             raise ImportError(f'{module_name} does not define a Component class') from None
@@ -54,19 +54,18 @@ get_component = get
 class ComponentType(type):
     """Metaclass that instantiates and collects component classes as they are defined"""
 
-    def __new__(mcs, name, bases, namespace):
-        dependencies = tuple(namespace.pop('depends', ()))
+    def __new__(mcs, name, bases, attrs):
+        dependencies = tuple(attrs.pop('depends', ()))
         assert all(
             isinstance(d, ComponentType) or isinstance(d, tuple) and isinstance(d[0], ComponentType)
             for d in dependencies
         )
-        namespace['depends'] = dependencies
-        cls = super().__new__(mcs, name, bases, namespace)
+        attrs['depends'] = dependencies
+        cls = super().__new__(mcs, name, bases, attrs)
         pkg = mcs.get_component_package(cls)
         # always make sure namespace and pkg_name are set on every class:
-        if not namespace.get('namespace'):
-            cls.namespace = _fix_namespace(namespace.get('namespace') or pkg.__name__)
-        if not namespace.get('pkg_name'):
+        cls.namespace = _fix_namespace(attrs.get('namespace') or pkg.__name__)
+        if not attrs.get('pkg_name'):
             cls.pkg_name = pkg.__name__
         mcs.register(cls)
         return cls
