@@ -2,7 +2,6 @@
 
 """Standards for look and behavior of concrete, functional parts of the system"""
 import logging
-import operator
 import sys
 from importlib import import_module
 from operator import attrgetter
@@ -18,37 +17,36 @@ _registry = {}
 def _fix_namespace(namespace):
     if namespace.startswith('cherrymusic.'):
         namespace = namespace[len('cherrymusic.'):]
-    else:
-        namespace = '_.' + namespace
-    assert namespace and '.' not in {namespace[0], namespace[-1]}
+    assert namespace
     return namespace
 
 
 def _unfix_namespace(namespace):
-    if namespace[:2] == '_.':
-        return namespace[2:]
-    return 'cherrymusic.' + namespace
+    if not namespace.startswith('cherrymusic.'):
+        namespace = 'cherrymusic.' + namespace
+    return namespace
 
 
 def iter_components():
     yield from _registry.values()
 
 
-def get(namespace):
+def get_component(namespace):
     namespace = _fix_namespace(namespace)
-    try:
-        return _registry[namespace]
-    except KeyError:
+    if namespace not in _registry:
         pkg_name = _unfix_namespace(namespace)
         module_name = pkg_name + '.components'
         try:
-            import_module(module_name)  # this should register the component under namespace
-            return _registry[namespace]
-        except KeyError:  # pragma: no cover
-            raise ImportError(f'{module_name} does not define a Component class') from None
-
-
-get_component = get
+            module = sys.modules[module_name]
+        except KeyError:
+            module = sys.modules[pkg_name]
+        for name in dir(module):
+            if name.startswith('__'):  # pragma: no cover
+                continue
+            thing = getattr(module, name)
+            if isinstance(thing, ComponentType) and thing.namespace == namespace:
+                    ComponentType.register(thing)
+    return _registry[namespace]
 
 
 class ComponentType(type):
@@ -150,6 +148,9 @@ class Component(ImmutableNamespace, metaclass=ComponentType):
     def __eq__(self, other):
         return self is other
 
+    def __ne__(self, other):
+        return self is not other
+
     def set_up(self):  # pragma: no cover
         pass
 
@@ -172,7 +173,7 @@ def init_components():
             if rest:
                 dep_name, = rest  # unpack single rest
             else:
-                dep_name = dep_cls.namespace.split('.')[-1]
+                dep_name = dep_cls.namespace.split('.')[-1].lower()
             if dep_name in deps:
                 raise ValueError(f'Dependency name conflict:'
                                  f' {dep_name} is {type(deps[dep_name])} and {dep_cls}')
