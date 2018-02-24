@@ -3,8 +3,8 @@ import os
 
 import pytest
 
-from cherrymusic import files
 from cherrymusic.common.test.helpers import tempdir
+from cherrymusic.media import files
 
 
 def test_path_attributes():
@@ -38,13 +38,13 @@ def test_path_depth():
 
 def test_path_equality():
     assert files.Path('SOME_NAME') == files.Path('SOME_NAME')
-    assert not (files.Path('SOME_NAME') != files.Path('SOME_NAME'))
+    assert not files.Path('SOME_NAME') != files.Path('SOME_NAME')
     assert hash(files.Path('SOME_NAME')) == hash(files.Path('SOME_NAME'))
 
     assert files.Path('SOME_NAME') == 'SOME_NAME'
     assert files.Path('.') == '.'
     assert '.' == files.Path('.')
-    assert not ('.' != files.Path('.'))
+    assert not '.' != files.Path('.')
 
     assert files.Path('') != ''
     assert not (files.Path('') == '')
