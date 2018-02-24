@@ -61,10 +61,9 @@ class ComponentType(type):
         attrs['depends'] = dependencies
         cls = super().__new__(mcs, name, bases, attrs)
         pkg = mcs.get_component_package(cls)
-        # always make sure namespace and pkg_name are set on every class:
-        cls.namespace = _fix_namespace(attrs.get('namespace') or pkg.__name__)
         if not attrs.get('pkg_name'):
             cls.pkg_name = pkg.__name__
+        cls.namespace = mcs.get_component_namespace(cls)
         mcs.register(cls)
         return cls
 
@@ -74,7 +73,7 @@ class ComponentType(type):
 
         Top-level modules are treated the same as packages.
         """
-        pkg_name = cls.__dict__.get('pkg_name')
+        pkg_name = cls.__dict__.get('pkg_name')  # don't use inherited attrs
         if not pkg_name:
             assert sys.version_info >= (3, 6)
             module = sys.modules[cls.__module__]
@@ -98,6 +97,14 @@ class ComponentType(type):
             return sys.modules[pkg_name]
         except KeyError:
             return import_module(pkg_name)
+
+    @classmethod
+    def get_component_namespace(mcs, cls):
+        namespace = cls.__dict__.get('namespace')  # don't use inherited attrs
+        if not namespace:
+            pkg = mcs.get_component_package(cls)
+            namespace = pkg.__name__
+        return _fix_namespace(namespace)
 
     @classmethod
     def register(mcs, component):
