@@ -30,8 +30,7 @@ def _testdb(name=':memory:', *statements):
 
 
 def _temp_db_dir(func):
-    """Decorator to use a temporary database directory to work with actual files"""
-
+    """Use a temporary database directory to work with actual files"""
     @wraps(func)
     def wrapper(*args, **kwargs):
         with helpers.tempdir() as tempdir:

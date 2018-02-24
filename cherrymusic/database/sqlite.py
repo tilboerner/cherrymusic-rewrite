@@ -139,7 +139,8 @@ class SqliteTransaction:
     def execute(self, sql, params=(), cursor_callback=sqlite3.Cursor.fetchall):
         """Execute SQL with given params and return (by default: all) results"""
         with closing(self._connection().execute(sql, params)) as cursor:
-            return cursor_callback(cursor)
+            if cursor_callback:
+                return cursor_callback(cursor)
 
     def _connection(self, *, may_be_none=False):
         """Return the active transaction's db connection, or raise appropriate errors"""
