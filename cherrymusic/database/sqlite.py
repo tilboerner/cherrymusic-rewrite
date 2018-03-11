@@ -1,8 +1,10 @@
 # -*- coding: UTF-8 -*-
+import logging
 import os
 import pathlib
 import sqlite3
 import threading
+import time
 from contextlib import closing
 from enum import Enum
 
@@ -21,6 +23,9 @@ class ISOLATION(Enum):
     DEFERRED = "DEFERRED"
     IMMEDIATE = "IMMEDIATE"
     EXCLUSIVE = "EXCLUSIVE"
+
+
+query_logger = logging.getLogger(__name__ + '.queries').info
 
 
 class SqliteDatabase:
@@ -138,16 +143,24 @@ class SqliteTransaction:
 
     def execute(self, sql, params=(), cursor_callback=sqlite3.Cursor.fetchall):
         """Execute SQL with given params and return (by default: all) results"""
-        with closing(self._connection().execute(sql, params)) as cursor:
-            if cursor_callback:
-                return cursor_callback(cursor)
+        if query_logger:
+            query_start_time = time.time()
+            query_logger(f'Query:\n\t{sql}\nParams:\n\t{params!r}')
+        try:
+            with closing(self._connection().execute(sql, params)) as cursor:
+                if cursor_callback:
+                    return cursor_callback(cursor)
+        finally:
+            if query_logger:
+                runtime = time.time() - query_start_time
+                query_logger(f'Runtime: {round(runtime, 3):.3f}s')
 
     def _connection(self, *, may_be_none=False):
         """Return the active transaction's db connection, or raise appropriate errors"""
         try:
             conn = self.__local.connection
         except AttributeError:
-            raise TransactionError(f'Do not share sessions accross threads! ({self})') from None
+            raise TransactionError(f'Do not share transactions across threads! ({self})') from None
         if conn is None and not may_be_none:
             raise TransactionError(f'Do not call outside of transaction context! ({self})')
         return conn
@@ -156,7 +169,7 @@ class SqliteTransaction:
         """Create the db connection for the transaction or raise an error when one already exists"""
         conn = self._connection(may_be_none=True)
         if conn is not None:
-            raise TransactionError(f'Sessions cannot be nested! ({self})')
+            raise TransactionError(f'Transactions cannot be nested! ({self})')
         conn = self.__local.connection = self.database.connect(
             isolation=self.isolation,
             timeout_secs=self.timeout_secs,
