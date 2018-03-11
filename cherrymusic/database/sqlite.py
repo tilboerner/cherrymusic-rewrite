@@ -37,14 +37,14 @@ class SqliteDatabase:
             separators and appending `.sqlite`. Use ':memory:' for an in-memory database.
     """
 
-    def __init__(self, qualname):
-
+    def __init__(self, qualname, *, basepath=None):
+        basepath = basepath or DB_BASEDIR
         self.qualname = qualname
         if qualname == ':memory:':
             self.db_path = ':memory:'
         else:
             subpath = qualname.replace('.', os.path.sep) + '.sqlite'
-            self.db_path = os.path.join(DB_BASEDIR, subpath)
+            self.db_path = os.path.join(basepath, subpath)
 
     def __repr__(self):
         clsname = type(self).__name__
