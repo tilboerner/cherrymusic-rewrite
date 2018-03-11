@@ -79,6 +79,10 @@ class SqliteDatabase:
             kwargs['timeout'] = timeout_secs
         return sqlite3.connect(target, **kwargs)
 
+    def execute(self, sql, params=(), **kwargs):
+        with self.transaction(isolation=ISOLATION.DEFAULT) as tx:
+            return tx.execute(sql, params, **kwargs)
+
     def _ensure_db_dir(self):
         db_dir, db_file = os.path.split(self.db_path)
         if not os.path.exists(db_dir):

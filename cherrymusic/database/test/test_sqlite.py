@@ -124,3 +124,8 @@ def test_transaction_isolation():
         test_transaction.execute('INSERT INTO test VALUES (3);')
 
         assert other.execute('SELECT * FROM test;') == [(2,), (3,)]
+
+
+def test_database_execute():
+    db = _testdb()
+    assert db.execute('SELECT 1') == [(1,)]
