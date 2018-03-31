@@ -5,17 +5,17 @@ from cherrymusic.common import types
 
 
 def test_immutablenamespace():
-    assert types.ImmutableNamespace(a=42).a == 42
-    assert types.ImmutableNamespace(a=42).__dict__ == {'a': 42}
+    assert types.FrozenNamespace(a=42).a == 42
+    assert types.FrozenNamespace(a=42).__dict__ == {'a': 42}
 
     with pytest.raises(AttributeError):
-        types.ImmutableNamespace(a=42).a = 666
+        types.FrozenNamespace(a=42).a = 666
 
     with pytest.raises(AttributeError):
-        types.ImmutableNamespace().b = 43
+        types.FrozenNamespace().b = 43
 
     with pytest.raises(AttributeError):
-        del types.ImmutableNamespace(a=42).a
+        del types.FrozenNamespace(a=42).a
 
 
 def test_cachedproperty():

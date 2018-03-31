@@ -3,10 +3,10 @@ import os
 import pathlib
 import sys
 
-from cherrymusic.common.types import CachedProperty, ImmutableNamespace
+from cherrymusic.common.types import CachedProperty, FrozenNamespace
 
 
-class Path(ImmutableNamespace):
+class Path(FrozenNamespace):
 
     def __init__(self, name, *, parent=None, **kwargs):
         is_simple_name = (

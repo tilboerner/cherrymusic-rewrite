@@ -2,7 +2,7 @@
 from types import SimpleNamespace
 
 
-class ImmutableNamespace(SimpleNamespace):
+class FrozenNamespace(SimpleNamespace):
     """A kind of :cls:`types.SimpleNamespace` that can't change attributes after initialization"""
 
     def __setattr__(self, key, *args, **kwargs):
