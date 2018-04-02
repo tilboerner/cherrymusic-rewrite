@@ -117,6 +117,13 @@ def test_recursive_scandir():
     assert found_paths['dir/subfile'].is_dir is False
 
 
+def test_recursive_scandir_maxdepth():
+    with tempdir('dir/', 'dir/subdir/subfile') as tmp_path:
+        found_paths = set(files.recursive_scandir(tmp_path, max_depth=1))
+
+    assert found_paths == {'dir', 'dir/subdir'}
+
+
 def test_recursive_scandir_yields_startpath_if_file_or_subdir():
     with tempdir('dir/file') as tmp_dir:
         assert list(files.recursive_scandir('file', root=tmp_dir / 'dir')) == ['file']
