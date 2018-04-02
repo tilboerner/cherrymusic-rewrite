@@ -2,8 +2,39 @@
 import os
 import pathlib
 import sys
+from urllib.parse import quote_from_bytes, unquote_to_bytes
 
 from cherrymusic.common.types import CachedProperty, FrozenNamespace
+
+
+def _pathcodec():
+    # This works very much like os.fs(en|de)code, except that encoding and error handling
+    # remain parameters.
+    fs_encoding = sys.getfilesystemencoding()
+    fs_errors = sys.getfilesystemencodeerrors()  # probably 'surrogateescape'
+    fspath = os.fspath
+
+    def encode_path(path, *, encoding=fs_encoding, errors=fs_errors):
+        """Encode a path to bytes."""
+        path = fspath(path)
+        if isinstance(path, str):
+            return path.encode(encoding, errors)
+        else:  # pragma: no cover
+            return path
+
+    def decode_path(path, *, encoding=fs_encoding, errors=fs_errors):
+        """Decode a path to str."""
+        path = fspath(path)
+        if isinstance(path, bytes):
+            return path.decode(encoding, errors)
+        else:
+            return path
+
+    return encode_path, decode_path
+
+
+encode_path, decode_path = _pathcodec()
+del _pathcodec
 
 
 class Path(FrozenNamespace):
@@ -25,7 +56,7 @@ class Path(FrozenNamespace):
                 parent = parent.path
         else:
             # force to str and normalize (strs may contain surrogates from errors='surrogateescape')
-            path = os.path.join(*map(os.fsdecode, (parent or '', name)))
+            path = os.path.join(*map(decode_path, (parent or '', name)))
             normpath = os.path.normcase(os.path.normpath(path))
             parent, name = os.path.split(normpath)
         # intern strings for quick comparisons and dict lookups
@@ -54,17 +85,41 @@ class Path(FrozenNamespace):
         return type(self)(other, parent=self, **kwargs)
 
     @CachedProperty
-    def path(self):  # may contain surrogates from errors='surrogateescape')
+    def path(self):  # may contain surrogates from errors='surrogateescape'
         # since self.name and self.parent are normalized, we can concat instead of os.path.join
         parent, name = self.parent, self.name
         path = (parent and parent + os.path.sep) + name
         return sys.intern(path)
 
+    @CachedProperty
+    def display(self) -> str:
+        """Get a display version of the path with easy-on-the-eye placeholders for decode errors.
+
+        .. warning::
+        Lossy conversion: information un-decodable bytes will be unrecoverably lost, and the
+        resulting path will not work in place of the original one.
+        """
+        bytes_path = encode_path(self.path)  # turn potential surrogate escapes into original bytes
+        return decode_path(bytes_path, errors='replace')
+
+    @CachedProperty
+    def as_url(self) -> str:
+        """Escape path to make it usable in a URL."""
+        return quote_from_bytes(bytes(self))
+
+    @classmethod
+    def from_url(cls, url_path: str):
+        """Turn a URL-escaped path into a Path object."""
+        return cls(unquote_to_bytes(url_path))
+
+    def __bytes__(self):
+        return encode_path(self.path)
+
     def __fspath__(self):  # may contain surrogates from errors='surrogateescape')
         return self.path
 
-    def __str__(self):  # may contain surrogates from errors='surrogateescape')
-        return os.fsdecode(self)
+    def __str__(self):
+        return self.display
 
     def __hash__(self):
         return hash(os.fspath(self))

@@ -98,7 +98,18 @@ def test_path_special_dirs():
 
 
 def test_path_surrogates():
-    assert str(files.Path(b'\xfe')) == '\udcfe'
+    assert files.Path(b'\xfe').path == '\udcfe'  # surrogateescape
+    assert str(files.Path(b'\xfe')) == '\ufffd' == '�'
+
+
+def test_path_display():
+    assert files.Path(b'a\xfeb').display == 'a\ufffdb' == 'a�b'
+
+
+def test_path_url():
+    path = files.Path(b'a\xfeb/cde')
+    assert path.as_url == 'a%FEb/cde'
+    assert files.Path.from_url(path.as_url) == path
 
 
 def test_path_string_attributes_are_interned():
