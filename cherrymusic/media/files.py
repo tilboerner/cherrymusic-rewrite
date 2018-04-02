@@ -1,6 +1,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 import os
+import pathlib
 
 from .data import Path
 
@@ -86,4 +87,7 @@ def circular_symlink_filter(root):
 
 
 def hidden_file_filter():
-    return lambda path: not (path.name and path.name[0] in {'.', b'.'})
+    return lambda path: (
+        path.name[0:1] != '.' and
+        all(part[0] != '.' for part in pathlib.PurePath(path.parent).parts)
+    )

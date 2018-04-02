@@ -193,3 +193,16 @@ def test_circular_symlink_filter():
         assert not filter_allows('below_known_root')
         assert not filter_allows('back_to_root')
         assert filter_allows('safe_despite_common_suffix')
+
+
+def test_hidden_file_filter():
+    path = files.Path
+    filter_allows = files.hidden_file_filter()
+    assert filter_allows(path('name'))
+    assert filter_allows(path('dot.name'))
+    assert filter_allows(path('./name'))
+    assert not filter_allows(path(''))
+    assert not filter_allows(path('.name'))
+    assert not filter_allows(path('dir/.name'))
+    assert not filter_allows(path('../name'))
+    assert not filter_allows(path('.dir/name'))
